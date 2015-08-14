@@ -1,30 +1,15 @@
 require 'test_helper'
 
-class TypeSerializer < ActiveModel::Serializer
-  attributes :name, :id
-end
-
-class UserSerializer < ActiveModel::Serializer
-  attributes :name, :id
-
-  has_one :type, serializer: TypeSerializer, embed: :ids, include: true
-  has_one :parent, serializer: UserSerializer, embed: :ids, include: true
-end
 
 class UserSerializerTest < ActiveSupport::TestCase
   test "serializer embeds the inner types" do
-    child_type = Type.new(name: "child")
-    child_type.save!
+    child_type = Type.create(name: "child")
+    parent_type = Type.create(name: "parent")
 
-    parent_type = Type.new(name: "parent")
-    parent_type.save!
+    parent = User.create(name: "The Parent", type: parent_type)
+    child1 = User.create(name: "The child", type: child_type, parent: parent)
 
-    parent = User.new(name: "The Parent", type: parent_type)
-    parent.save!
-    child1 = User.new(name: "The child", type: child_type, parent: parent)
-    child1.save!
-
-    serializer = UserSerializer.new(child1)
+    result = UserSerializer.new(child1).as_json
 
     expected_result = {
       "user"=>{
@@ -35,12 +20,12 @@ class UserSerializerTest < ActiveSupport::TestCase
       },
       "types"=>[
         {
-          :name=>"child",
-          :id=>child_type.id
-        },
-        {
           :name=>"parent",
           :id=>parent_type.id
+        },
+        {
+          :name=>"child",
+          :id=>child_type.id
         }
       ],
       "parents"=>[
@@ -53,6 +38,6 @@ class UserSerializerTest < ActiveSupport::TestCase
       ]
     }
 
-    assert_equal(expected_result, serializer.as_json)
+    assert_equal(expected_result, result)
   end
 end
